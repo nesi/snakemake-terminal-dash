@@ -1,2 +1,3 @@
-# snakemake-terminal-dash
-Terminal based dashboard for Snakemake processes 
+# Terminal based monitor for Snakemake processes 
+
+
