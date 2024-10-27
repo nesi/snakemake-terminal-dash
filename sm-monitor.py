@@ -42,7 +42,7 @@ def format_memory(memory_str):
     return memory_str
 
 class SnakemakeMonitor:
-    def __init__(self, workflow_id=None, refresh_rate=5):
+    def __init__(self, workflow_id=None, refresh_rate=30):  # Changed default to 30 seconds
         self.workflow_id = workflow_id
         self.refresh_rate = refresh_rate
         self.screen = None
@@ -61,8 +61,9 @@ class SnakemakeMonitor:
     def update_job_stats(self, jobs):
         """Update job statistics"""
         self.job_stats.clear()
+        # Count only parent jobs (ignore .batch jobs)
         for job in jobs:
-            if job:
+            if job and not job['job_id'].endswith('.batch'):
                 self.job_stats[job['state']] += 1
     
     def draw_header(self):
@@ -80,16 +81,18 @@ class SnakemakeMonitor:
             line += 1
         return line + 1
     
-    def format_table_row(self, values, widths):
+    def format_table_row(self, values, widths, align_left=None):
         """Format a row with proper padding and alignment"""
+        if align_left is None:
+            align_left = [True] * len(values)  # Default all to left alignment
+            
         row = []
-        for value, width in zip(values, widths):
+        for value, width, left_align in zip(values, widths, align_left):
             value = str(value)
-            # Left-align strings, right-align numbers
-            if value.isdigit():
-                row.append(f"{value:>{width}}")
-            else:
+            if left_align:
                 row.append(f"{value:<{width}}")
+            else:
+                row.append(f"{value:>{width}}")
         return "  ".join(row)
     
     def draw_job_table(self, start_line, jobs):
@@ -102,10 +105,13 @@ class SnakemakeMonitor:
                  self.col_widths['memory'],
                  self.col_widths['cpus']]
         
+        # Define which columns should be left-aligned (True) or right-aligned (False)
+        alignments = [True, True, True, True, False, False]  # JobID now left-aligned
+        
         self.screen.addstr(start_line, 0, "Active Jobs:", curses.A_BOLD)
         
         # Draw headers
-        header_str = self.format_table_row(headers, widths)
+        header_str = self.format_table_row(headers, widths, alignments)
         self.screen.addstr(start_line + 1, 0, header_str, curses.A_BOLD)
         
         # Draw separator line
@@ -123,7 +129,7 @@ class SnakemakeMonitor:
                     format_memory(job['memory']),
                     job['cpus']
                 ]
-                job_str = self.format_table_row(values, widths)
+                job_str = self.format_table_row(values, widths, alignments)
                 self.screen.addstr(line, 0, job_str)
                 line += 1
                 
@@ -175,8 +181,8 @@ class SnakemakeMonitor:
 def main():
     parser = argparse.ArgumentParser(description='Monitor Snakemake jobs on Slurm')
     parser.add_argument('--workflow-id', help='Specific workflow ID to monitor')
-    parser.add_argument('--refresh-rate', type=int, default=5,
-                      help='Refresh rate in seconds (default: 5)')
+    parser.add_argument('--refresh-rate', type=int, default=30,  # Changed default to 30 seconds
+                      help='Refresh rate in seconds (default: 30)')
     args = parser.parse_args()
     
     monitor = SnakemakeMonitor(args.workflow_id, args.refresh_rate)
